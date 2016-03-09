@@ -3,13 +3,13 @@
 
 // Underlying structure
 struct Underlying{
-	float S;
+	double S;
 	
-	long RatedType;	// Domestic Rate type: 0 - Fixed, 1 - Term
-	long RatedSize;	// Domestic rate size
+	long DRateType;	// Rf type for the underlying: 0 - Fixed, 1 - Term
+	long DRateSize;	// Rf size
 
-	long RatefType;	// Foreign Rate type: 0 - Fixed, 1 - Term
-	long RatefSize;	// Foreign Rate size
+	long FRateType;	// Div type for the underlying: 0 - Fixed, 1 - Term
+	long FRateSize;	// Div size
 
 	long VolType;	// Vol type for the underlying: 0 - Fixed, 1 - Term, 2 - Surf
 	long VolSizet;	// Vol size along time axis
@@ -23,7 +23,7 @@ struct Payoff{
 
 	long BermudanType;		// Bermudan Type: 0 - Final / 1 - Bermudan / 2 - Coupon (in Monthly Redemption Type)
 
-	long PayoffType;		// Payoff Type
+	long PayoffType;			// Payoff Type
 							// Vanilla: 0 - Call, 1 - Put (Modified to be compatible in ELS payoffs)
 							// Digital: 2 - DigitCall, 3 - DigitPut
 							// KO/KI: 4 - KOCall, 5 - KICall, 6 - KOPut, 7 - KIPut
@@ -32,33 +32,33 @@ struct Payoff{
 
 	long RefPriceType;		// Reference price setting (btw assets) option: 0 - Minimum / 1 - Average
 
-	float K;				// Strike
-	float UpBarrier;		// Up barrier (only in this schedule)
-	float DownBarrier;		// Down barrier (only in this schedule)
-	float TotalUpBarrier;	// Total up barrier (globally effective)
-	float TotalDownBarrier;	// Total down barrier (globally effective)
-	float RetUpBarrier;
-	float RetDownBarrier;
-
-	float Coupon;			// Coupon amount
-	float Dummy;			// Dummy amount, if any
-	float Participation;	// Participation rate
+	double K;				// Strike
+	double UpBarrier;		// Up barrier (only in this schedule)
+	double DownBarrier;		// Down barrier (only in this schedule)
+	double TotalUpBarrier;	// Total up barrier (globally effective)
+	double TotalDownBarrier;	// Total down barrier (globally effective)
+	double Coupon;			// Coupon amount
+	double Dummy;			// Dummy amount, if any
+	double Participation;	// Participation rate
 };
 
 // YTM structure
 struct YTM{
-	long YTMType;			// YTM Type	
-	long YTMSize;			// YTM Size
+	long YTMType;	// YTM Type	
+	long YTMSize;	// YTM Size
 };
 
 // Price result
 struct Result{
-	float price;					// Product price
-	float delta[FXSizeMax];		// Delta
-	float vega[FXSizeMax];		// Vega
-	float rho[FXSizeMax];		// Rho
-	float rho_d[FXSizeMax];		// Rho
-	float rho_f[FXSizeMax];		// Rho
+	double price;		// Product price
+	double up_delta[StockSizeMax];		// Up Delta
+	double down_delta[StockSizeMax];	// Down Delta
+	double gamma[StockSizeMax];		// Gamma
+	double vega[StockSizeMax];		// Vega
+	double rho[StockSizeMax];		// Rho
+	double theta;		// Theta
+	double vanna[StockSizeMax];		// Vanna
+	double volga[StockSizeMax];		// Volga
 
 	long prob;
 };

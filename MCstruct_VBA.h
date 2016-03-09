@@ -7,8 +7,8 @@ struct VBARate{
 	long RateType;
 	long RateSize;
 
-    float Ratet[RateTMax];
-    float Rater[RateTMax];
+    double Ratet[RateTMax];
+    double Rater[RateTMax];
 };
 
 struct VBAVol{
@@ -16,19 +16,19 @@ struct VBAVol{
     long VolSizet;
     long VolSizeK;
     
-    float Volt[VolTMax];
-    float VolK[VolKMax];
-    float Volv[VolTMax * VolKMax];
+    double Volt[VolTMax];
+    double VolK[VolKMax];
+    double Volv[VolTMax * VolKMax];
 };
 
 struct VBAUnderlying{
-    float S;
-	float BasePrice;
+    double S;
+	double BasePrice;
     struct VBARate Rfd;
     struct VBARate Rff;
     struct VBAVol Vol;
-	float Quanto;
-	float Corr_row[FXSizeMax];
+	double Quanto;
+	double Corr_row[StockSizeMax];
 };
 
 struct VBAPayoff{
@@ -39,18 +39,19 @@ struct VBAPayoff{
     long PayoffType;
 	long RefPriceType;
     
-	float K;
-    float UpBarrier;
-    float DownBarrier;
-    float TotalUpBarrier;
-    float TotalDownBarrier;
-    float Participation;
+	double K;
+    double UpBarrier;
+    double DownBarrier;
+    double TotalUpBarrier;
+    double TotalDownBarrier;
+    double Participation;
 
-    float Coupon;
-	float Dummy;
+    double Coupon;
+	double Dummy;
 };
 
 struct VBACalcOption{
+	long StockNum;
 	long ScheduleNum;
 	long SimN;
 	long SimMode;
@@ -60,12 +61,16 @@ struct VBACalcOption{
 };
 
 struct VBAResult{
-    float price;
-	float delta[FXSizeMax];
-	float vega[FXSizeMax];		// Vega
-	float rho[FXSizeMax];
-	float rhod[FXSizeMax];
-	float rhof[FXSizeMax];
+    double price;
+    double delta[StockSizeMax];
+    double gamma[StockSizeMax];
+	double vega[StockSizeMax];		// Vega
+	double rho[StockSizeMax];
+	double theta;
+	double vanna[StockSizeMax];		// Vanna
+	double volga[StockSizeMax];		// Volga
 
-	float prob[ScheduleSizeMax];
+	double prob[ScheduleSizeMax];
+
+	double coupon;
 };

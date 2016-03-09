@@ -6,15 +6,19 @@ extern "C"
 #endif
 
 // MC function
-void CalcMC(float* FXPrice_, long FXSize_,
+void CalcMC(long StockSize_, double* StockPrice_, double* BasePrice_,
 			long ScheduleSize_,	
-			long* PayoffT_, long* PayoffT_pay, long* PayoffType_, long* RefPriceType_,
-			float* PayoffK_, float Accret_,
- 			long* RatedType_, long* RatedSize_, float* Ratedt_, float* Rated_,
-			long* RatefType_, long* RatefSize_, float* Rateft_, float* Ratef_,
- 			long* VolType_, long* VolSizet_, long* VolSizeK_, float* Volt_, float* VolK_, float* Vol_,
-			long YTMType_, long YTMSize_, float* YTMt_, float* YTM_,
-			long isStrikePriceQuote_, long SimN_, long SimMode_, long blockN_, long threadN_,
+			long* PayoffT_, long* PayoffT_pay, long* BermudanType_, long* PayoffType_, long* RefPriceType_,
+			double* PayoffK_, double* Coupon_, double* Dummy_,
+			double AccRet, double AccRet_KO,
+			double UpAmt, double DownAmt, double* Participation_,
+ 			long* DRateType_, long* DRateSize_, double* DRatet_, double* DRate_,
+			long* FRateType_, long* FRateSize_, double* FRatet_, double* FRate_,
+ 			long* VolType_, long* VolSizet_, long* VolSizeK_, double* Volt_, double* VolK_, double* Vol_,
+			long YTMType_, long YTMSize_, double* YTMt_, double* YTM_,
+			double* correl_, double* Quanto_,
+			long isStrikePriceQuote_, long VolInterpMode_, 
+			long SimN_, long SimMode_, long blockN_, long threadN_,
 			struct VBAResult* result);
 
 

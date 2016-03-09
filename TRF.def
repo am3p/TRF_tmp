@@ -1,0 +1,4 @@
+LIBRARY	TRF
+
+EXPORTS
+	Pricer_MC

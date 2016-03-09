@@ -24,17 +24,17 @@
 #include "MCstruct_VBA.h"
 #include "VariableSize.h"
 
-__declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* StockPrice, double* BasePrice,
-														   long YTMType, long YTMTNum, double* YTMT, double* YTM,
-														   long* DRateType, long* DRateTNum, double* DRateT, double* DRate,
-														   long* FRateType, long* FRateTNum, double* FRateT, double* FRate,
+__declspec(dllexport) struct VBAResult __stdcall Solver_MC(long NStock, double* StockPrice, double* BasePrice,
+														   long* RateType, long* RateTNum, double* RateT, double* Rate,
+														   long* DivType, long* DivTNum, double* DivT, double* Div,
 														   long* VolType, long* VolTNum, long* VolKNum, double* VolT, double* VolK, double* Vol,
 														   long* FXVolType, long* FXVolTNum, double* FXVolT, double* FXVol,
 														   double* StockCorr,  double* FXCorr,
 														   long NSchedule, long* T_exp, long* T_pay, long* BermudanType, long* PayoffType, long* RefPriceType,
-														   double* Strike, double UpAmt, double DownAmt, double AccRet_KO, double AccRet, double* Participation,
-														   long Mode, long SimN, long blockN, long threadN, 
-														   long isStrikePriceQuote, long VolInterpMode){
+														   double* Strike, double* UpBarrier, double* DownBarrier, double* Coupon, double* Dummy, double* Participation,
+														   double TotalUpBarrier, double TotalDownBarrier, long isUpTouched, long isDownTouched,
+														   long SimN, long blockN, long threadN, long isStrikePriceQuote, long VolInterpMode,
+														   double Price){
 
 	long i, j, k; double s;
 
@@ -69,7 +69,7 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	// Vol info: fixed case, term structure, and surface
 	// Time axis size: Max 40 (Covering NICE Full data)
 	// Price axis size for vol surface: Max 21 (Covering NICE Full data)
-	double Volt_[StockSizeMax * VolTMax] = {0}, VolK_[StockSizeMax * VolTMax * VolKMax] = {0}, Vol_[StockSizeMax * VolTMax * VolKMax] = {0};
+	double Volt_[StockSizeMax * VolTMax] = {0}, VolK_[StockSizeMax * VolKMax] = {0}, Vol_[StockSizeMax * VolTMax * VolKMax] = {0};
 	long VolTInd_src = 0, VolTInd_dest = 0, VolKInd_src = 0, VolKInd_dest = 0, VolInd_src = 0, VolInd_dest = 0;
 
 	// Correlation: Cholesky decomposed (LD), Max 4x4 (just my purpose)
@@ -90,6 +90,10 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	// Schedule info: Participation rate
 	double Participation_[ScheduleSizeMax] = {0};
 
+	long Solve_Iter = 0;
+	double Coupon_a = 0.0, Coupon_b = 20.0, Coupon_ind = 1.0;
+	double price_diff = 100.0;
+
 	// Result format
 	struct VBAResult* result = (struct VBAResult *) malloc(sizeof(struct VBAResult));
 	struct VBAResult result_VBA;
@@ -106,7 +110,6 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	for (i = 0; i < 100; i++){
 		result->prob[i] = 0;
 	}
-	result->coupon = 0;
 
 	// Copying product info for CUDA function
 	for (i = 0; i < NStock; i++){
@@ -116,12 +119,12 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	}
 
 	// YTM info
-	YTMType_ = YTMType;
-	YTMSize_ = YTMTNum;
+	YTMType_ = RateType[0];
+	YTMSize_ = RateTNum[0];
 	switch(YTMType_){
 		case 0:
 			{
-				YTM_[YTMInd_dest] = YTM[YTMInd_src];
+				YTM_[YTMInd_dest] = Rate[YTMInd_src];
 				YTMInd_src++;
 				YTMInd_dest = RateTMax;
 				break;
@@ -129,8 +132,8 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 		case 1:
 			{
 				for (i = 0; i < YTMSize_; i++){
-					YTMt_[YTMInd_dest] = YTMT[YTMInd_src];
-					YTM_[YTMInd_dest] = YTM[YTMInd_src];
+					YTMt_[YTMInd_dest] = RateT[YTMInd_src];
+					YTM_[YTMInd_dest] = Rate[YTMInd_src];
 					YTMInd_src++;
 					YTMInd_dest++;
 				}
@@ -142,27 +145,27 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	}
 
 	// Risk free rate info
-	DRateInd_src = DRateInd_src;
+	RateInd_src = YTMInd_src;
 	for (i = 0; i < NStock; i++){
-		DRateType_[i] = DRateType[i];
-		DRateSize_[i] = DRateTNum[i];
-		switch(DRateType_[i]){
+		RateType_[i] = RateType[i+1];
+		RateSize_[i] = RateTNum[i+1];
+		switch(RateType_[i]){
 			case 0:
 				{
-					DRate_[DRateInd_dest] = DRate[DRateInd_src];
-					DRateInd_src++;
-					DRateInd_dest = (i+1)*RateTMax;
+					Rate_[RateInd_dest] = Rate[RateInd_src];
+					RateInd_src++;
+					RateInd_dest = (i+1)*RateTMax;
 					break;
 				}
 			case 1:
 				{
-					for (j = 0; j < DRateSize_[i]; j++){
-						DRatet_[DRateInd_dest] = DRateT[DRateInd_src];
-						DRate_[DRateInd_dest] = DRate[DRateInd_src];
-						DRateInd_src++;
-						DRateInd_dest++;
+					for (j = 0; j < RateSize_[i]; j++){
+						Ratet_[RateInd_dest] = RateT[RateInd_src];
+						Rate_[RateInd_dest] = Rate[RateInd_src];
+						RateInd_src++;
+						RateInd_dest++;
 					}
-					DRateInd_dest = (i+1)*RateTMax;
+					RateInd_dest = (i+1)*RateTMax;
 					break;
 				}
 			default:
@@ -170,28 +173,27 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 		}
 	}
 
-	// Risk free rate info
-	FRateInd_src = FRateInd_src;
+	// Dividend info
 	for (i = 0; i < NStock; i++){
-		FRateType_[i] = FRateType[i];
-		FRateSize_[i] = FRateTNum[i];
-		switch(FRateType_[i]){
+		DivType_[i] = DivType[i];
+		DivSize_[i] = DivTNum[i];
+		switch(DivType_[i]){
 			case 0:
 				{
-					FRate_[FRateInd_dest] = FRate[FRateInd_src];
-					FRateInd_src++;
-					FRateInd_dest = (i+1)*RateTMax;
+					Div_[DivInd_dest] = Div[DivInd_src];
+					DivInd_src++;
+					DivInd_dest = (i+1)*DivTMax;
 					break;
 				}
 			case 1:
 				{
-					for (j = 0; j < FRateSize_[i]; j++){
-						FRatet_[FRateInd_dest] = FRateT[FRateInd_src];
-						FRate_[FRateInd_dest] = FRate[FRateInd_src];
-						FRateInd_src++;
-						FRateInd_dest++;
+					for (j = 0; j < DivSize_[i]; j++){
+						Divt_[DivInd_dest] = DivT[DivInd_src];
+						Div_[DivInd_dest] = Div[DivInd_src];
+						DivInd_src++;
+						DivInd_dest++;
 					}
-					FRateInd_dest = (i+1)*RateTMax;
+					DivInd_dest = (i+1)*DivTMax;
 					break;
 				}
 			default:
@@ -216,9 +218,9 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 				{
 					for (j = 0; j < VolTNum[i]; j++){
 						Volt_[VolTInd_dest] = VolT[VolTInd_src];
-						Vol_[VolInd_dest] = Vol[VolInd_src];						
-						VolTInd_src++; VolTInd_dest++;
+						Vol_[VolInd_dest] = Vol[VolInd_src];
 						VolInd_src++; VolInd_dest++;
+						VolTInd_src++; VolTInd_dest++;
 					}
 					VolTInd_dest = (i+1)*VolTMax;
 					VolInd_dest = (i+1)*VolTMax*VolKMax;
@@ -232,20 +234,17 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 					}
 					VolTInd_dest = (i+1)*VolTMax;
 
-					//for (j = 0; j < VolKNum[i]; j++){
-					//	VolK_[VolKInd_dest] = VolK[VolKInd_src];
-					//	VolKInd_src++; VolKInd_dest++;
-					//}
-					//VolKInd_dest = (i+1)*VolKMax;
+					for (j = 0; j < VolKNum[i]; j++){
+						VolK_[VolKInd_dest] = VolK[VolKInd_src];
+						VolKInd_src++; VolKInd_dest++;
+					}
+					VolKInd_dest = (i+1)*VolKMax;
 
 					for (j = 0; j < VolTNum[i]; j++){
 						for (k = 0; k < VolKNum[i]; k++){
-							VolK_[VolKInd_dest] = VolK[VolKInd_src];
 							Vol_[VolInd_dest] = Vol[VolInd_src];
-							VolKInd_src++; VolKInd_dest++;
 							VolInd_src++; VolInd_dest++;
 						}
-						VolKInd_dest = i*VolTMax*VolKMax + (j+1)*VolKMax;
 						VolInd_dest = i*VolTMax*VolKMax + (j+1)*VolKMax;
 					}
 					VolInd_dest = (i+1)*VolTMax*VolKMax;
@@ -270,7 +269,9 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 	QuantoInd_src = 0; QuantoInd_dest = 0;
 	for (i = 0; i < NStock; i++){
 		if (FXVolType[i] == 0){
-			QuantoAdj[i] = FXCorr[i] * FXVol[i];
+			QuantoAdj[QuantoInd_dest] = FXCorr[QuantoInd_src] * FXVol[QuantoInd_src];
+			QuantoInd_src++;
+			QuantoInd_dest++;
 		}
 		else if (FXVolType[i] == 1){
 			// not yet defined
@@ -287,51 +288,66 @@ __declspec(dllexport) struct VBAResult __stdcall Pricer_MC(long NStock, double* 
 		RefPriceType_[i] = RefPriceType[i];
 
 		PayoffK_[i] = Strike[i];
+		UpBarrier_[i] = UpBarrier[i];
+		DownBarrier_[i] = DownBarrier[i];
 
 		Participation_[i] = Participation[i];
 	}
 
-	// MC function
-	CalcMC(NStock, StockPrice_, BasePrice_,
-		   NSchedule,	
-		   PayoffT_, PayoffT_pay, BermudanType_, PayoffType_, RefPriceType_,
-		   PayoffK_, Coupon_, Dummy_,
-		   AccRet, AccRet_KO,
-		   UpAmt, DownAmt, Participation_,
-		   DRateType_, DRateSize_, DRatet_, DRate_,
-		   FRateType_, FRateSize_, FRatet_, FRate_,
-		   VolType_, VolSize_t_, VolSize_K_, Volt_, VolK_, Vol_,
-		   YTMType_, YTMSize_, YTMt_, YTM_,
-		   StockCorr_LD, QuantoAdj,
-		   isStrikePriceQuote, VolInterpMode, SimN, Mode, blockN, threadN,
-		   result);
+	// ver 0.1: Bisection method (Need to be modified to Brent's method)
+	while (Solve_Iter < 100){
 
-	// Arrange result
-	result_VBA.price = result->price;
-	for (i = 0; i < ScheduleSizeMax; i++){
-		result_VBA.prob[i] = result->prob[i];
-	}
-	if (Mode > 0){
-		for (i = 0; i < NStock; i++)
-			result_VBA.delta[i] = result->delta[i];
-		for (i = 0; i < NStock; i++)
-			result_VBA.gamma[i] = result->gamma[i];
-		for (i = 0; i < NStock; i++)
-			result_VBA.vega[i] = result->vega[i];
-	}
-	if (Mode > 1){
-		for (i = 0; i < NStock; i++)
-			result_VBA.rho[i] = result->rho[i];
-		result_VBA.theta = result->theta;
-	}
-	if (Mode > 2){
-		for (i = 0; i < NStock; i++)
-			result_VBA.vanna[i] = result->vanna[i];
-		for (i = 0; i < NStock; i++)
-			result_VBA.volga[i] = result->volga[i];
+		if((Coupon_a - Coupon_b < 1e-4 && Coupon_a - Coupon_b > -1e-4) ||
+		   (price_diff < 1e-6 && price_diff > -1e-6))
+			break;
+
+		Coupon_ind = 1;
+		for (i = 0; i < NSchedule; i++){
+			Coupon_[i] = (Coupon_a + Coupon_b)/2.0 * Coupon_ind;
+			if (i < NSchedule-1)
+				Dummy_[i] = 0.0;
+			else
+				Dummy_[i] = Coupon_[i];
+			Coupon_ind++;
+		}
+		result->price = 0;
+
+
+		// MC function
+		CalcMC(NStock, StockPrice_, BasePrice_,
+			   NSchedule,	
+			   PayoffT_, PayoffT_pay, BermudanType_, PayoffType_, RefPriceType_,
+			   PayoffK_, Coupon_, Dummy_,
+			   UpBarrier_, DownBarrier_, TotalUpBarrier, TotalDownBarrier,
+			   Participation_,
+			   isUpTouched, isDownTouched,
+			   RateType_, RateSize_, Ratet_, Rate_,
+			   DivType_, DivSize_, Divt_, Div_,
+			   VolType_, VolSize_t_, VolSize_K_, Volt_, VolK_, Vol_,
+			   YTMType_, YTMSize_, YTMt_, YTM_,
+			   StockCorr_LD, QuantoAdj,
+			   isStrikePriceQuote, VolInterpMode, SimN, 0, blockN, threadN,
+			   result);
+
+		// Arrange result
+		price_diff = (result->price - Price);
+		if(price_diff > 0)
+			Coupon_b = (Coupon_a + Coupon_b)/2.0;
+		else if(price_diff < 0)
+			Coupon_a = (Coupon_a + Coupon_b)/2.0;
+		else{
+			Coupon_a = (Coupon_a + Coupon_b)/2.0;
+			Coupon_b = Coupon_a;
+			break;
+		}
+
+		Solve_Iter++;
 	}
 
 	free(result);
+
+	result_VBA.price = price_diff + Price;
+	result_VBA.coupon = (Coupon_a + Coupon_b)/2.0;
 	return result_VBA;
 }
 
